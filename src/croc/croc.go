@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/denisbrodbeck/machineid"
+	"github.com/djherbis/times"
 	ignore "github.com/sabhiram/go-gitignore"
 	log "github.com/schollz/logger"
 	"github.com/schollz/pake/v3"
@@ -160,7 +161,10 @@ type FileInfo struct {
 	FolderSource string      `json:"fs,omitempty"`
 	Hash         []byte      `json:"h,omitempty"`
 	Size         int64       `json:"s,omitempty"`
+	AccessTime   time.Time   `json:"a,omitempty"`
 	ModTime      time.Time   `json:"m,omitempty"`
+	BirthTime    time.Time   `json:"b,omitempty"`
+	HasBirthTime bool        `json:"b?,omitempty"`
 	IsCompressed bool        `json:"c,omitempty"`
 	IsEncrypted  bool        `json:"e,omitempty"`
 	Symlink      string      `json:"sy,omitempty"`
@@ -412,13 +416,17 @@ func GetFilesInfo(fnames []string, zipfolder bool, ignoreGit bool, exclusions []
 				err = errAbs
 				return
 			}
+			t := times.Get(stat)
 
 			fInfo := FileInfo{
 				Name:         stat.Name(),
 				FolderRemote: "./",
 				FolderSource: filepath.Dir(absPath),
 				Size:         stat.Size(),
-				ModTime:      stat.ModTime(),
+				AccessTime:   t.AccessTime(),
+				ModTime:      t.ModTime(),
+				BirthTime:    t.BirthTime(),
+				HasBirthTime: t.HasBirthTime(),
 				Mode:         stat.Mode(),
 				TempFile:     true,
 				IsIgnored:    ignoredPaths[absPath],
@@ -445,12 +453,16 @@ func GetFilesInfo(fnames []string, zipfolder bool, ignoreGit bool, exclusions []
 					}
 					remoteFolder := strings.TrimPrefix(filepath.Dir(pathName), absPathWithSeparator)
 					if !info.IsDir() {
+						t := times.Get(info)
 						fInfo := FileInfo{
 							Name:         info.Name(),
 							FolderRemote: strings.ReplaceAll(remoteFolder, string(os.PathSeparator), "/") + "/",
 							FolderSource: filepath.Dir(pathName),
 							Size:         info.Size(),
-							ModTime:      info.ModTime(),
+							AccessTime:   t.AccessTime(),
+							ModTime:      t.ModTime(),
+							BirthTime:    t.BirthTime(),
+							HasBirthTime: t.HasBirthTime(),
 							Mode:         info.Mode(),
 							TempFile:     false,
 							IsIgnored:    ignoredPaths[pathName],
@@ -481,12 +493,16 @@ func GetFilesInfo(fnames []string, zipfolder bool, ignoreGit bool, exclusions []
 			}
 
 		} else {
+			t := times.Get(stat)
 			fInfo := FileInfo{
 				Name:         stat.Name(),
 				FolderRemote: "./",
 				FolderSource: filepath.Dir(absPath),
 				Size:         stat.Size(),
-				ModTime:      stat.ModTime(),
+				AccessTime:   t.AccessTime(),
+				ModTime:      t.ModTime(),
+				BirthTime:    t.BirthTime(),
+				HasBirthTime: t.HasBirthTime(),
 				Mode:         stat.Mode(),
 				TempFile:     false,
 				IsIgnored:    ignoredPaths[absPath],
@@ -1671,10 +1687,6 @@ func (c *Client) recipientInitializeFile() (err error) {
 		if errChmod != nil {
 			log.Error(errChmod)
 		}
-		errChtimes := os.Chtimes(pathToFile, time.Now().Local(), c.FilesToTransfer[c.FilesToTransferCurrentNum].ModTime)
-		if errChtimes != nil {
-			log.Error(errChtimes)
-		}
 		truncate = true
 	}
 	if truncate {
@@ -1690,6 +1702,25 @@ func (c *Client) recipientInitializeFile() (err error) {
 
 func (c *Client) recipientGetFileReady(finished bool) (err error) {
 	if finished {
+		transferFile := c.FilesToTransfer[c.FilesToTransferCurrentNum]
+		pathToFile := path.Join(
+			transferFile.FolderRemote,
+			transferFile.Name,
+		)
+
+		log.Debugf("setting times %v %v %v", transferFile.AccessTime, transferFile.ModTime, transferFile.BirthTime)
+		if runtime.GOOS == "windows" && transferFile.HasBirthTime {
+			errSetTime := utils.SetFileTime(pathToFile, transferFile.AccessTime, transferFile.BirthTime, transferFile.ModTime)
+			if errSetTime != nil {
+				log.Error(errSetTime)
+			}
+		} else {
+			errChtimes := os.Chtimes(pathToFile, transferFile.AccessTime, transferFile.ModTime)
+			if errChtimes != nil {
+				log.Error(errChtimes)
+			}
+		}
+
 		// TODO: do the last finishing stuff
 		log.Debug("finished")
 		err = message.Send(c.conn[0], c.Key, message.Message{

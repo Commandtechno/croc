@@ -6,6 +6,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/chzyer/readline v1.5.1
 	github.com/denisbrodbeck/machineid v1.0.1
+	github.com/djherbis/times v1.6.0
 	github.com/kalafut/imohash v1.1.0
 	github.com/magisterquis/connectproxy v0.0.0-20200725203833-3582e84f0c9b
 	github.com/minio/highwayhash v1.0.3
@@ -19,7 +20,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.37.0
 	golang.org/x/net v0.39.0
-	golang.org/x/sys v0.32.0
+	golang.org/x/sys v0.33.0
 	golang.org/x/term v0.31.0
 	golang.org/x/time v0.11.0
 )
