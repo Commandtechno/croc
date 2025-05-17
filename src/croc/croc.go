@@ -1671,6 +1671,10 @@ func (c *Client) recipientInitializeFile() (err error) {
 		if errChmod != nil {
 			log.Error(errChmod)
 		}
+		errChtimes := os.Chtimes(pathToFile, time.Now().Local(), c.FilesToTransfer[c.FilesToTransferCurrentNum].ModTime)
+		if errChtimes != nil {
+			log.Error(errChtimes)
+		}
 		truncate = true
 	}
 	if truncate {
